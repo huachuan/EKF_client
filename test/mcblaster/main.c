@@ -318,7 +318,7 @@ rqwheel_note_tcp_reply(rqwheel_t *w, reqtype_t t, int k) {
   if (rqwheel_isempty(w)) {
     /* Ignore this reply. */
     if (!quiet) {
-      fprintf(stderr, "Got a TCP reply for a %s for key %s with empty "
+      fprintf(stderr, "Got a TCP reply for a %s for key %d with empty "
               "request queue!\n", reqtype_str[t], k);
     }
   }
@@ -365,7 +365,7 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k) {
   if (rqwheel_isempty(w)) {
     /* request wheel is empty. Ignore this reply. */
     if (!quiet) {
-      fprintf(stderr, "Got a UDP reply with id %d for key %s with empty "
+      fprintf(stderr, "Got a UDP reply with id %d for key %d with empty "
               "request queue!\n", (int)rs.rqid, k);
     }
   }
