@@ -813,7 +813,7 @@ static inline void to_udp_header(char* buf,
    if the reply indicates that the key was not found, -1 if reply
    indicated an error. */
 static inline int parse_udp_reply(const char *dgram, int len,
-                                  udphdr_t *udphdr, int *key) {
+                                  udphdr_t *udphdr, int *key, reqtype_t *t) {
   int rv;
   const char *reply = dgram+sizeof(udphdr_t);
   const char *sep;
@@ -838,24 +838,31 @@ static inline int parse_udp_reply(const char *dgram, int len,
     /* else assume that \r\n is in one of the parts to follow */
   }
 
-  rv = sscanf(reply, "VALUE " KEYPREFIX "-%d %*d %d", key, &bytes);
-  if (rv != 2) {
-    if (memcmp(reply, "END", 3) == 0 ||
-        memcmp(reply, "ERROR", 5) == 0 ||
-        memcmp(reply, "CLIENT_ERROR", 12) == 0 ||
-        memcmp(reply, "SERVER_ERROR", 12) == 0) {
-      /* value was not found or an error occurred */
-      return 0;
-    }
-    else {
-      /* invalid reply */
-      return -1;
-    }
-  }
-  else if (bytes != valsz)
-    return -1;
+  if (reply[0] == 'S') {
+	  *t = req_set;
+	  if (strncmp(reply, "STORED", 6)) return -2;
+	  return 1;
+  } else {
+	  *t = req_get;
+	  rv = sscanf(reply, "VALUE " KEYPREFIX "-%d %*d %d", key, &bytes);
+	  if (rv != 2) {
+		  if (memcmp(reply, "END", 3) == 0 ||
+		      memcmp(reply, "ERROR", 5) == 0 ||
+		      memcmp(reply, "CLIENT_ERROR", 12) == 0 ||
+		      memcmp(reply, "SERVER_ERROR", 12) == 0) {
+			  /* value was not found or an error occurred */
+			  return 0;
+		  }
+		  else {
+			  /* invalid reply */
+			  return -1;
+		  }
+	  }
+	  else if (bytes != valsz)
+		  return -1;
 
-  return 1;
+	  return 1;
+  }
 }
 
 
@@ -899,7 +906,7 @@ static inline int dgram_ap_events(dgram_ap_t *ap, struct pollfd *ufd) {
 /* Send a GET request for a random key into _ap_. Returns 0 if the request
    was successfully sent, otherwise returns -1. errno is set to EWOULDBLOCK
    if the request could not  */
-static inline int dgram_ap_send(dgram_ap_t *ap) {
+static inline int dgram_ap_send(dgram_ap_t *ap, reqtype_t t) {
   char buf[128];
   int dgsize;
   int rv;
@@ -907,7 +914,11 @@ static inline int dgram_ap_send(dgram_ap_t *ap) {
 
   to_udp_header(buf, ap->reqs.nextrqid, nreplyports);
 
-  dgsize = compose_get(buf+8, sizeof(buf)-8, k) + 8;
+  if (t == req_get) {
+	  dgsize = compose_get(buf+8, sizeof(buf)-8, k) + 8;
+  } else {
+	  dgsize = compose_set(buf+8, sizeof(buf)-8, k) + 8;
+  }
 
   rv = sendto(ap->s, buf, dgsize, 0,
               (struct sockaddr*)&hostaddr_udp, sizeof(hostaddr_udp));
@@ -917,7 +928,7 @@ static inline int dgram_ap_send(dgram_ap_t *ap) {
     return -1;
   }
 
-  rqwheel_append_request(&ap->reqs, req_get, k);
+  rqwheel_append_request(&ap->reqs, t, k);
 
   return 0;
 }
@@ -934,6 +945,7 @@ static inline int dgram_ap_recv(dgram_ap_t *ap) {
   socklen_t from_len = sizeof(from);
   udphdr_t udphdr;
   int key=-1;
+  reqtype_t t;
 
   dglen = recvfrom(ap->s, ap->rcvbuf, ap->rcvbufsize, 0,
                    (struct sockaddr*)&from, &from_len);
@@ -952,15 +964,17 @@ static inline int dgram_ap_recv(dgram_ap_t *ap) {
 
   ap->rcvbuf[dglen]='\0';
 
-  rv = parse_udp_reply(ap->rcvbuf, dglen, &udphdr, &key);
-  if (rv < 0) {
+  rv = parse_udp_reply(ap->rcvbuf, dglen, &udphdr, &key, &t);
+  if (rv == -2) ap->reqs.th->stats[req_set].nbogus++;
+  else if (rv < 0) {
     ap->reqs.th->stats[req_get].nbogus++;
   }
   else {
     if (rv == 0) {
       ap->reqs.th->stats[req_get].nfailed++;
     }
-    rqwheel_note_udp_reply(&ap->reqs, udphdr, key);
+    /* rqwheel_note_udp_reply(&ap->reqs, udphdr, key); */
+    rqwheel_note_tcp_reply(&ap->reqs, t, key);
   }
 
   return 0;
@@ -1204,9 +1218,10 @@ static void *thread_main(void *arg) {
       if (q[t].size > 0) {
         q[t].current = (cycle_timer() - th->tstart) / q[t].size;
         if (q[t].last < q[t].current) {
-          if (t == req_get && th->udp.s >= 0)
-            rv = dgram_ap_send(&th->udp);
+          if (th->udp.s >= 0)
+		  rv = dgram_ap_send(&th->udp, t);
           else {
+		  assert(0);
             rv = conn_send(&th->conns[nextconn], t, random()%nkeys);
             nextconn = succ(nextconn, nconns);
           }
@@ -1462,9 +1477,9 @@ int main(int argc, char *argv[]) {
 
   hostname = argv[optind];
 
-  if (rates[req_set] > 0 && port_tcp == 0) {
-    die("Must specify a TCP port for sets (-p)\n");
-  }
+  /* if (rates[req_set] > 0 && port_tcp == 0) { */
+  /*   die("Must specify a TCP port for sets (-p)\n"); */
+  /* } */
 
   if (rates[req_get] > 0 && port_tcp == 0 && port_udp == 0) {
     die("Must specify a port for gets (-p or -u)\n");
