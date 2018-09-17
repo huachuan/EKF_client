@@ -183,7 +183,7 @@ static const char *hostname;     /* host where memcached runs */
 static struct in_addr hostaddr;  /* ip address of host */
 static char hostaddr_str[32];    /* ip address of host as a string */
 static int port_tcp;
-static int port_udp;
+static int port_udp, client_port_udp;
 static int nthreads;    /* number of threads to run */
 static int nconns=1;    /* number of connections each thread opens */
 static int nkeys=10000;
@@ -196,6 +196,7 @@ static bool quiet=false;
 static bool nodelay=true; /* set TCP nodelay */
 static int socksndbufsz; /* socket sendbuf size, 0 to use system defaults */
 
+static struct sockaddr_in clientaddr_udp; /* ip:port for UDP client */
 static struct sockaddr_in hostaddr_udp; /* ip:port for UDP requests */
 static struct sockaddr_in hostaddr_tcp; /* ip:port for TCP requests */
 
@@ -871,6 +872,9 @@ static void dgram_ap_init(dgram_ap_t *ap, int maxoutstanding, thread_t *th) {
     setbufsize(ap->s, SO_SNDBUF, socksndbufsz);
   }
 
+  if (bind(ap->s, (struct sockaddr *)&clientaddr_udp, sizeof(clientaddr_udp)) < 0) {
+	  perror("bind failed");
+  }
   ap->rcvbufsize = min(getbufsize(ap->s, SO_RCVBUF), (64*1024))+1024;
   ap->rcvbuf = (char*)malloc(ap->rcvbufsize);
   if (!ap->rcvbuf)
@@ -1230,6 +1234,7 @@ int usage(void) {
 " Options:\n"
 "  -p <port>         memcached TCP port\n"
 "  -u <port>         memcached UDP port, if set all gets are over UDP\n"
+"  -f <port>         flow/client UDP port\n"
 "  -c N              open N TCP connections per thread (default 1)\n"
 "  -d N              run for N seconds, by default run until SIGINT\n"
 "  -k N              operate on N keys (default 1)\n"
@@ -1346,7 +1351,7 @@ int main(int argc, char *argv[]) {
         maxthreads);
   }
 
-  while ((opt=getopt(argc, argv, "p:u:c:d:k:nqr:s:t:w:x:z:")) != EOF) {
+  while ((opt=getopt(argc, argv, "p:u:c:d:k:nqr:s:t:w:x:z:f:")) != EOF) {
     switch (opt) {
 
     case 'p':
@@ -1360,6 +1365,13 @@ int main(int argc, char *argv[]) {
       port_udp = atoi(optarg);
       if (port_udp <= 0) {
         die("Invalid UDP port: %s\n", optarg);
+      }
+      break;
+
+    case 'f':
+      client_port_udp = atoi(optarg);
+      if (client_port_udp <= 0) {
+        die("Invalid client UDP port: %s\n", optarg);
       }
       break;
 
@@ -1475,6 +1487,11 @@ int main(int argc, char *argv[]) {
     hostaddr_udp.sin_family = AF_INET;
     hostaddr_udp.sin_addr.s_addr = hostaddr.s_addr;
     hostaddr_udp.sin_port = htons(port_udp);
+
+    clientaddr_udp.sin_family = AF_INET;
+    clientaddr_udp.sin_addr.s_addr = htonl(INADDR_ANY);
+    assert(client_port_udp > 0);
+    clientaddr_udp.sin_port = htons(client_port_udp);
   }
 
   if (port_tcp > 0) {
