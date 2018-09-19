@@ -355,7 +355,7 @@ rqwheel_note_tcp_reply(rqwheel_t *w, reqtype_t t, int k) {
    reply or -1 if the reply indicated that the key was not found or an
    error occurred. */
 static inline void
-rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k) {
+rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
   int match; /* expected position of the corresponding request in w->rqs[] */
   int last = (w->head == 0 ? w->size-1 : w->head-1);
   uint16_t rqdistance = rs.rqid - (uint16_t)w->rqs[w->tail].id;
@@ -405,6 +405,13 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k) {
     }
     return;
   }
+  if (t >= 0 && rq->type != t) {
+    if (!quiet) {
+      fprintf(stderr, "Got a reply of type %s, expected %s\n",
+              reqtype_str[t], reqtype_str[rq->type]);
+    }
+    return ;
+  }
 
   if (rq->npartsleft < 0) {
     /* got first reply part for this request */
@@ -420,9 +427,9 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k) {
 
   rq->npartsleft--;
 
-  if (rs.partno == 0 && k < 0 && !quiet) {
-    fprintf(stderr, "'get' request for key %d failed\n", rq->key);
-  }
+  /* if (rs.partno == 0 && k < 0 && !quiet) { */
+  /*   fprintf(stderr, "'get' request for key %d failed\n", rq->key); */
+  /* } */
 
   if (rq->npartsleft > 0)
     return;
@@ -431,7 +438,7 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k) {
 
   rq->treply = cycle_timer();
 
-  stats_update_rtts(&w->th->stats[req_get], rq->tsent, rq->treply,
+  stats_update_rtts(&w->th->stats[t], rq->tsent, rq->treply,
                     w->th->cpufreq);
 
   if (match == w->tail) {
@@ -973,8 +980,8 @@ static inline int dgram_ap_recv(dgram_ap_t *ap) {
     if (rv == 0) {
       ap->reqs.th->stats[req_get].nfailed++;
     }
-    /* rqwheel_note_udp_reply(&ap->reqs, udphdr, key); */
-    rqwheel_note_tcp_reply(&ap->reqs, t, key);
+    rqwheel_note_udp_reply(&ap->reqs, udphdr, key, t);
+    /* rqwheel_note_tcp_reply(&ap->reqs, t, key); */
   }
 
   return 0;
