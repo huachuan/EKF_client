@@ -907,7 +907,7 @@ static inline int dgram_ap_events(dgram_ap_t *ap, struct pollfd *ufd) {
    was successfully sent, otherwise returns -1. errno is set to EWOULDBLOCK
    if the request could not  */
 static inline int dgram_ap_send(dgram_ap_t *ap, reqtype_t t) {
-  char buf[128];
+  char buf[256];
   int dgsize;
   int rv;
   int k = random() % nkeys;
