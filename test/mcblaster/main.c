@@ -252,6 +252,7 @@ stats_update_rtts(stats_t *st, uint64_t tsent, uint64_t treply, double cpufreq) 
 
 
 static void rqwheel_init(rqwheel_t *w, int size, thread_t *th) {
+  if (size > 65536) size = 65536;
   memset(w, 0, sizeof(*w));
   w->size = size;
   w->nextrqid = 0;
