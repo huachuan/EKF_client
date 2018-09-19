@@ -32,7 +32,7 @@
 
 #define STACKSIZE (1024*1024) /* thread stack size in bytes */
 
-#define KEYPREFIX "kkkkkkkkkkk" /* key format is KEYPREFIX-<num> */
+#define KEYPREFIX "kkkkkkkkk" /* key format is KEYPREFIX-<num> */
 
 #define RQWHEELCAP 100 /* the number of seconds worth of requests that a
                         request wheel must be able to hold (ex: at 100 req/s
@@ -524,12 +524,12 @@ static void conn_init(conn_t *conn, int maxoutstanding, int maxmsgsize,
 
 
 static inline int compose_get(char *buf, int bufsize, int k) {
-  return snprintf(buf, bufsize, "get " KEYPREFIX "-%04d\r\n", k);
+  return snprintf(buf, bufsize, "get " KEYPREFIX "-%06d\r\n", k);
 }
 
 static inline int compose_set(char *buf, int bufsize, int k) {
   int rqhdrlen = snprintf(buf, bufsize, "set " KEYPREFIX
-                                        "-%04d 0 0 %d\r\n", k, valsz);
+                                        "-%06d 0 0 %d\r\n", k, valsz);
 
   if (rqhdrlen >= bufsize-1 || rqhdrlen+valsz+3 > bufsize) {
     die("Internal error: bufsize (%d) is too small in compose_set(). "
