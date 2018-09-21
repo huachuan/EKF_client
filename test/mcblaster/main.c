@@ -1204,7 +1204,7 @@ static void *thread_main(void *arg) {
 
   thread_block_signals();
 
-  bind_thread_to_cpu(th->cpu);
+  /* bind_thread_to_cpu(th->cpu); */
   th->cpufreq = get_cpu_frequency();
 
   /* The main loop spins on poll(), trying to send one get/set every
