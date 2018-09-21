@@ -179,6 +179,8 @@ typedef struct thread_s {
 } thread_t;
 
 
+static int generation = 0;
+static int gl_ley = 0;
 static const char *hostname;     /* host where memcached runs */
 static struct in_addr hostaddr;  /* ip address of host */
 static char hostaddr_str[32];    /* ip address of host as a string */
@@ -926,6 +928,8 @@ static inline int dgram_ap_send(dgram_ap_t *ap, reqtype_t t) {
   int rv;
   int k = random() % nkeys;
 
+  if (generation) k = (gl_ley++) % nkeys;
+
   to_udp_header(buf, ap->reqs.nextrqid, nreplyports);
 
   if (t == req_get) {
@@ -1269,6 +1273,7 @@ int usage(void) {
 "  -k N              operate on N keys (default 1)\n"
 "  -n                turn OFF tcp nodelay (default is ON)\n"
 "  -q                suppress warnings\n"
+"  -g                workload generation\n"
 "  -r N              try to send N gets per second (default 0)\n"
 "  -s N              set socket send buffers to N bytes\n"
 "  -t N              start N threads, default and max is as many as cores\n"
@@ -1380,7 +1385,7 @@ int main(int argc, char *argv[]) {
         maxthreads);
   }
 
-  while ((opt=getopt(argc, argv, "p:u:c:d:k:nqr:s:t:w:x:z:f:")) != EOF) {
+  while ((opt=getopt(argc, argv, "p:u:c:d:k:nqr:s:t:w:x:z:f:g:")) != EOF) {
     switch (opt) {
 
     case 'p':
@@ -1432,6 +1437,10 @@ int main(int argc, char *argv[]) {
 
     case 'q':
       quiet = true;
+      break;
+
+    case 'g':
+      generation = 1;
       break;
 
     case 'r':
@@ -1501,6 +1510,11 @@ int main(int argc, char *argv[]) {
 
   if (rates[req_set] == 0 && rates[req_get] == 0) {
     die("Must specify set rate (-w) or get rate (-r) or both.\n");
+  }
+  if (generation) {
+    if (rates[req_get] > 0 || rates[req_set] * duration < nkeys) {
+      die("Cannot generate all keys or have get request.\n");
+    }
   }
 
   signal(SIGPIPE, SIG_IGN);
