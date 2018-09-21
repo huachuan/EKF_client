@@ -295,7 +295,13 @@ static inline void rqwheel_append_request(rqwheel_t *w, reqtype_t t, int k) {
   if (w->head == w->tail) {
     /* the queue is full, count message at .head as timed out. We do it here
        rather than during reply handling because replies may be lost. */
-    w->th->stats[w->rqs[w->tail].type].ntimedout++;
+    req_t *rq; /* matching request */
+    reqtype_t ht;
+    rq = &w->rqs[w->tail];
+    rq->treply = cycle_timer();
+    ht = w->rqs[w->tail].type;
+    /* stats_update_rtts(&w->th->stats[ht], rq->tsent, rq->treply, w->th->cpufreq); */
+    w->th->stats[ht].ntimedout++;
     do {
       w->tail = succ(w->tail, w->size);
     } while (w->tail != w->head && w->rqs[w->tail].treply > 0);
