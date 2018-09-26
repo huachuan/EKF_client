@@ -195,7 +195,7 @@ static int rates[reqtype_n]; /* try to send this many
                                 sets and gets per second */
 static int valsz=100;
 static int duration;    /* run duration in seconds */
-static bool quiet=false;
+static bool quiet=true;
 static bool nodelay=true; /* set TCP nodelay */
 static int socksndbufsz; /* socket sendbuf size, 0 to use system defaults */
 
@@ -1340,6 +1340,9 @@ void print_stats(void) {
 
   for (t=0; t<reqtype_n; t++) {
     if (totals[t].nsent > 0) {
+      uint64_t avg;
+      if (totals[t].nmeasured == 0) avg = 0;
+      else avg = (uint64_t)(totals[t].rtt_total/totals[t].nmeasured/cpufreq);
       printf("\n\
 Request type   : %s\n\
 Requests sent  : %lu\n\
@@ -1355,7 +1358,7 @@ Ignored pkts   : %lu\n",
              (double)totals[t].nsent*1000000/elapsed_usec,
              totals[t].nmeasured,
              (uint64_t)(totals[t].rtt_min/cpufreq),
-             (uint64_t)(totals[t].rtt_total/totals[t].nmeasured/cpufreq),
+             avg,
              (uint64_t)(totals[t].rtt_max/cpufreq),
              totals[t].ntimedout,
              totals[t].nfailed,
