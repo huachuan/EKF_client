@@ -977,6 +977,8 @@ static inline int dgram_ap_recv(dgram_ap_t *ap) {
   int key=-1;
   reqtype_t t;
 
+begin:
+  key = -1;
   dglen = recvfrom(ap->s, ap->rcvbuf, ap->rcvbufsize, 0,
                    (struct sockaddr*)&from, &from_len);
   if (dglen < 0) {
@@ -1004,6 +1006,7 @@ static inline int dgram_ap_recv(dgram_ap_t *ap) {
       ap->reqs.th->stats[req_get].nfailed++;
     }
     rqwheel_note_udp_reply(&ap->reqs, udphdr, key, t);
+    goto begin;
     /* rqwheel_note_tcp_reply(&ap->reqs, t, key); */
   }
 
