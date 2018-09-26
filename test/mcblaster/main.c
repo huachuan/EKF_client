@@ -79,7 +79,8 @@ typedef struct stats_s {
            ntimedout, /* number of requests that were not measured */
            nsent,     /* number of sent requests */
            nfailed,   /* number of reported errors */
-           nbogus;    /* number of malformed replies */
+           nbogus,    /* number of malformed replies */
+           nignore;   /* number of reported errors */
 } stats_t;
 
 
@@ -378,6 +379,9 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
       fprintf(stderr, "Got a UDP reply with id %d for key %d with empty "
               "request queue!\n", (int)rs.rqid, k);
     }
+      w->th->stats[req_get].nignore++;
+      return;
+
   }
 
   match = (w->tail + (uint32_t)rqdistance) % w->size;
@@ -387,10 +391,12 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
      counter has already been incremented in rqwheel_append_request(). */
   if (w->tail <= last) {
     if (match < w->tail || last < match) {
+      w->th->stats[req_get].nignore++;
       return;
     }
   }
   else if (last < match && match < w->tail) {
+      w->th->stats[req_get].nignore++;
       return;
   }
 
@@ -405,6 +411,7 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
       fprintf(stderr, "Got reply for request id %u, expected %u\n",
               (unsigned)rs.rqid, (unsigned)(rq->id & 0xffff));
     }
+    w->th->stats[req_get].nignore++;
     return;
   }
   if (rq->key != k && k >= 0) {
@@ -412,6 +419,7 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
       fprintf(stderr, "Got reply for a 'get' with key %d, expected key %d\n",
               k, rq->key);
     }
+    w->th->stats[req_get].nignore++;
     return;
   }
   if (t >= 0 && rq->type != t) {
@@ -419,6 +427,7 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
       fprintf(stderr, "Got a reply of type %s, expected %s\n",
               reqtype_str[t], reqtype_str[rq->type]);
     }
+    w->th->stats[req_get].nignore++;
     return ;
   }
 
@@ -430,8 +439,9 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
     if (!quiet) {
       fprintf(stderr, "Got a duplicate reply for 'get' request %u "
               "for key %d\n", rq->id, rq->key);
-      return;
     }
+    w->th->stats[req_get].nignore++;
+    return;
   }
 
   rq->npartsleft--;
@@ -440,8 +450,10 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
   /*   fprintf(stderr, "'get' request for key %d failed\n", rq->key); */
   /* } */
 
-  if (rq->npartsleft > 0)
+  if (rq->npartsleft > 0) {
+    w->th->stats[req_get].nignore++;
     return;
+  }
 
   /* we got all reply parts, mark request completed */
 
@@ -1309,6 +1321,7 @@ void print_stats(void) {
       totals[t].nsent += threads[n].stats[t].nsent;
       totals[t].nfailed += threads[n].stats[t].nfailed;
       totals[t].nbogus += threads[n].stats[t].nbogus;
+      totals[t].nignore += threads[n].stats[t].nignore;
 
       for (i=0;
            i<sizeof(totals[t].rtt_buckets)/sizeof(totals[t].rtt_buckets[0]);
@@ -1335,7 +1348,8 @@ Measured RTTs  : %lu\n\
 RTT min/avg/max: %lu/%lu/%lu usec\n\
 Timeouts       : %lu\n\
 Errors         : %lu\n\
-Invalid replies: %lu\n",
+Invalid replies: %lu\n\
+Ignored pkts   : %lu\n",
              reqtype_str[t],
              totals[t].nsent,
              (double)totals[t].nsent*1000000/elapsed_usec,
@@ -1345,7 +1359,8 @@ Invalid replies: %lu\n",
              (uint64_t)(totals[t].rtt_max/cpufreq),
              totals[t].ntimedout,
              totals[t].nfailed,
-             totals[t].nbogus);
+             totals[t].nbogus,
+             totals[t].nignore);
     }
   }
 
