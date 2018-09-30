@@ -38,6 +38,7 @@
                         request wheel must be able to hold (ex: at 100 req/s
                         must hold 100*RQWHEELCAP requests) */
 
+#define SAMPLE_NUM (10000+1)
 #define max(a,b) ((a)>(b) ? (a) : (b))
 #define min(a,b) ((a)<(b) ? (a) : (b))
 
@@ -45,7 +46,6 @@
 #define succ(n, size) (((n)+1) % (size))
 
 extern double get_cpu_frequency(void);
-
 
 /* request types */
 typedef enum { req_get, req_set, reqtype_n } reqtype_t;
@@ -81,6 +81,9 @@ typedef struct stats_s {
            nfailed,   /* number of reported errors */
            nbogus,    /* number of malformed replies */
            nignore;   /* number of reported errors */
+
+  uint64_t samples[SAMPLE_NUM];
+
 } stats_t;
 
 
@@ -251,6 +254,13 @@ stats_update_rtts(stats_t *st, uint64_t tsent, uint64_t treply, double cpufreq) 
     st->nslow++;
   else
     st->rtt_buckets[(unsigned)(rtt / cpufreq / RTTBUCKET)]++;
+
+  if (st->nmeasured < SAMPLE_NUM) {
+    st->samples[st->nmeasured] = rtt / cpufreq;
+  } else {
+    int rk = (int)(treply % st->nmeasured) + 1;
+    if (rk < SAMPLE_NUM) st->samples[rk] = rtt / cpufreq;
+  }
 }
 
 
@@ -1386,6 +1396,9 @@ Ignored pkts   : %lu\n",
   /*DEBUG*/
   printf("\n%.2f pollfd structs per poll()\n",
          (double)threads[0].nufds/threads[0].npolls);
+  for(i=1; i<SAMPLE_NUM; i++) {
+    if (threads[0].stats[req_get].samples[i]) printf("%lu\n", threads[0].stats[req_get].samples[i]);
+  }
 }
 
 
