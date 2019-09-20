@@ -1589,6 +1589,11 @@ int main(int argc, char *argv[]) {
     die("calloc() failed while creating threads\n");
   }
 
+  rv = pthread_attr_init(&tattr);
+  if (rv != 0) {
+	die("pthread_attr_init() fail with ERROR: %d", rv);
+  }
+
   rv = pthread_attr_setstacksize(&tattr, STACKSIZE);
   if (rv != 0) {
     die("pthread_attr_setstacksize() failed to set thread stack size to %d\n",
@@ -1599,7 +1604,7 @@ int main(int argc, char *argv[]) {
     threads[i].cpu = i;
     rv = pthread_create(&threads[i].pt, &tattr, thread_main, threads+i);
     if (rv != 0)
-      die("pthread_create() failed with %d for thread #%i\n", i, errno);
+      die("pthread_create() failed with %d for thread #%i error%d\n", i, errno, rv);
   }
 
   signal(SIGINT, stopthreads);
