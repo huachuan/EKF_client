@@ -393,7 +393,6 @@ rqwheel_note_udp_reply(rqwheel_t *w, udphdr_t rs, int k, reqtype_t t) {
       return;
 
   }
-
   match = (w->tail + (uint32_t)rqdistance) % w->size;
 
   /* verify that _match_ is in [tail..last] modulo w->size. If it is not,
@@ -875,11 +874,14 @@ static inline int parse_udp_reply(const char *dgram, int len,
       return -1;
     /* else assume that \r\n is in one of the parts to follow */
   }
-
   if (reply[0] == 'S') {
 	  *t = req_set;
 	  if (strncmp(reply, "STORED", 6)) return -2;
 	  return 1;
+  } else if (reply[0] == 'g') {
+          *t = req_get;
+          if (strncmp(reply, "get", 3)) return -2;
+          return 1;
   } else {
 	  *t = req_get;
 	  rv = sscanf(reply, "VALUE " KEYPREFIX "-%d %*d %d", key, &bytes);
