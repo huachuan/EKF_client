@@ -919,6 +919,7 @@ static void dgram_ap_init(dgram_ap_t *ap, int maxoutstanding, thread_t *th) {
     setbufsize(ap->s, SO_SNDBUF, socksndbufsz);
   }
 
+  printf("bindto port: %d\n", ntohs(clientaddr_udp.sin_port));
   if (bind(ap->s, (struct sockaddr *)&clientaddr_udp, sizeof(clientaddr_udp)) < 0) {
 	  perror("bind failed");
   }
@@ -1396,11 +1397,11 @@ Ignored pkts   : %lu\n",
   }
 
   /*DEBUG*/
-  printf("\n%.2f pollfd structs per poll()\n",
+  /*printf("\n%.2f pollfd structs per poll()\n",
          (double)threads[0].nufds/threads[0].npolls);
   for(i=1; i<SAMPLE_NUM; i++) {
     if (threads[0].stats[req_get].samples[i]) printf("%lu\n", threads[0].stats[req_get].samples[i]);
-  }
+  }*/
 }
 
 
