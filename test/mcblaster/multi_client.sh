@@ -4,9 +4,9 @@ killall mcblaster
 nodes=$1
 rate=$2
 core=0
-total_core=32
-fp=11211
-dp=11211
+total_core=1
+fp=10000
+dp=8888
 idx=1
 
 for n in `seq $nodes`

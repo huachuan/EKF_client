@@ -1,0 +1,11 @@
+bindto port: 8888
+
+Request type   : get
+Requests sent  : 29
+Rate per second: -0
+Measured RTTs  : 1072623699
+RTT min/avg/max: 0/0/3580377109 usec
+Timeouts       : 2152541
+Errors         : 0
+Invalid replies: 0
+Ignored pkts   : 0

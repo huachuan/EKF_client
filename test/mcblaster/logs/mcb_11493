@@ -1,0 +1,11 @@
+bindto port: 11493
+
+Request type   : get
+Requests sent  : 3724
+Rate per second: 71743150165186214925446438344406343032181895889671532908416114179027863846518784
+Measured RTTs  : 1080032348
+RTT min/avg/max: 0/0/1132344352 usec
+Timeouts       : 2152449
+Errors         : 0
+Invalid replies: 0
+Ignored pkts   : 0

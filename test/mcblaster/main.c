@@ -948,7 +948,10 @@ static inline int dgram_ap_events(dgram_ap_t *ap, struct pollfd *ufd) {
    was successfully sent, otherwise returns -1. errno is set to EWOULDBLOCK
    if the request could not  */
 static inline int dgram_ap_send(dgram_ap_t *ap, reqtype_t t) {
-  char buf[256];
+
+  //char buf[256];
+  char   data_line[16][MAX]; 
+  char   pos_line[3][MAX]; 
   int dgsize;
   int rv;
   int k = random() % nkeys;
@@ -1433,7 +1436,6 @@ int main(int argc, char *argv[]) {
       break;
 
     case 'u':
-      port_udp = atoi(optarg);
       if (port_udp <= 0) {
         die("Invalid UDP port: %s\n", optarg);
       }
