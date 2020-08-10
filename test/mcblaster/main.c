@@ -22,7 +22,7 @@
 #include <netinet/in.h>
 #include "sysqueue.h"
 #include "cpu.h"
-
+#include "gpsdata.h"
 
 #define MAXSIZE 64000 /* max key value size in bytes */
 #define MAXKEYS 10000000 /* max number of keys */
@@ -201,6 +201,9 @@ static int duration;    /* run duration in seconds */
 static bool quiet=true;
 static bool nodelay=true; /* set TCP nodelay */
 static int socksndbufsz; /* socket sendbuf size, 0 to use system defaults */
+
+static int itr = 0; /*iteratively read in data from gpsdata.h*/
+static double pos[3];
 
 static struct sockaddr_in clientaddr_udp; /* ip:port for UDP client */
 static struct sockaddr_in hostaddr_udp; /* ip:port for UDP requests */
@@ -918,7 +921,7 @@ static void dgram_ap_init(dgram_ap_t *ap, int maxoutstanding, thread_t *th) {
   if (socksndbufsz > 0) {
     setbufsize(ap->s, SO_SNDBUF, socksndbufsz);
   }
-
+/*
   printf("bindto port: %d\n", ntohs(clientaddr_udp.sin_port));
   if (bind(ap->s, (struct sockaddr *)&clientaddr_udp, sizeof(clientaddr_udp)) < 0) {
 	  perror("bind failed");
@@ -927,7 +930,7 @@ static void dgram_ap_init(dgram_ap_t *ap, int maxoutstanding, thread_t *th) {
   ap->rcvbuf = (char*)malloc(ap->rcvbufsize);
   if (!ap->rcvbuf)
     die("Failed to malloc() %d bytes\n", ap->rcvbufsize);
-
+*/
   rqwheel_init(&ap->reqs, maxoutstanding, th);
 }
 
@@ -950,10 +953,10 @@ static inline int dgram_ap_events(dgram_ap_t *ap, struct pollfd *ufd) {
 static inline int dgram_ap_send(dgram_ap_t *ap, reqtype_t t) {
 
   //char buf[256];
-  char   data_line[16][MAX]; 
-  char   pos_line[3][MAX]; 
+  char   data_line[16][64];  
   int dgsize;
-  int rv;
+  int i, rv;
+/*
   int k = random() % nkeys;
 
   if (generation) k = (gl_ley++) % nkeys;
@@ -965,9 +968,14 @@ static inline int dgram_ap_send(dgram_ap_t *ap, reqtype_t t) {
   } else {
 	  dgsize = compose_set(buf+8, sizeof(buf)-8, k) + 8;
   }
-
-  rv = sendto(ap->s, buf, dgsize, 0,
-              (struct sockaddr*)&hostaddr_udp, sizeof(hostaddr_udp));
+*/
+  for (i = 0; i < 16; i++) {
+	  sprintf(data_line[i],"%.16f", input[itr % 25][i]);
+  }
+  printf("sendto\n");
+  rv = sendto(ap->s, data_line, sizeof(data_line), 0,
+              (struct sockaddr*)&hostaddr_udp, sizeof(hostaddr_udp)); 
+/*
   if (rv < dgsize) {
     if (errno != EWOULDBLOCK)
       die("Failed to write to a UDP socket: %s\n", strerror(errno));
@@ -975,7 +983,7 @@ static inline int dgram_ap_send(dgram_ap_t *ap, reqtype_t t) {
   }
 
   rqwheel_append_request(&ap->reqs, t, k);
-
+*/
   return 0;
 }
 
@@ -992,9 +1000,12 @@ static inline int dgram_ap_recv(dgram_ap_t *ap) {
   udphdr_t udphdr;
   int key=-1;
   reqtype_t t;
-
+  char   pos_line[3][64];
 begin:
   key = -1;
+  recvfrom(ap->s, pos_line, sizeof(pos_line), 0,
+                   (struct sockaddr*)&from, &from_len);
+/*
   dglen = recvfrom(ap->s, ap->rcvbuf, ap->rcvbufsize, 0,
                    (struct sockaddr*)&from, &from_len);
   if (dglen < 0) {
@@ -1005,7 +1016,6 @@ begin:
   }
 
   if (dglen <= sizeof(udphdr_t)) {
-    /* a malformed reply */
     ap->reqs.th->stats[req_get].nbogus++;
     return 0;
   }
@@ -1023,9 +1033,9 @@ begin:
     }
     rqwheel_note_udp_reply(&ap->reqs, udphdr, key, t);
     goto begin;
-    /* rqwheel_note_tcp_reply(&ap->reqs, t, key); */
+    // rqwheel_note_tcp_reply(&ap->reqs, t, key); 
   }
-
+*/
   return 0;
 }
 
@@ -1429,13 +1439,14 @@ int main(int argc, char *argv[]) {
     switch (opt) {
 
     case 'p':
-      port_tcp = atoi(optarg);
+      //port_tcp = atoi(optarg);
       if (port_tcp <= 0) {
         die("Invalid TCP port: %s\n", optarg);
       }
       break;
 
     case 'u':
+      port_udp = atoi(optarg);
       if (port_udp <= 0) {
         die("Invalid UDP port: %s\n", optarg);
       }
@@ -1569,11 +1580,12 @@ int main(int argc, char *argv[]) {
     hostaddr_udp.sin_family = AF_INET;
     hostaddr_udp.sin_addr.s_addr = hostaddr.s_addr;
     hostaddr_udp.sin_port = htons(port_udp);
-
+/*
     clientaddr_udp.sin_family = AF_INET;
     clientaddr_udp.sin_addr.s_addr = htonl(INADDR_ANY);
     assert(client_port_udp > 0);
     clientaddr_udp.sin_port = htons(client_port_udp);
+*/
   }
 
   if (port_tcp > 0) {
